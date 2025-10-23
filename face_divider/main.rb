@@ -2,6 +2,69 @@ require 'sketchup.rb'
 require 'set'
 
 module FaceDivider
+  module Compatibility
+    module_function
+
+    def ensure_ui_constants
+      return unless defined?(UI)
+
+      UI.const_set(:MF_UNCHECKED, 0) unless UI.const_defined?(:MF_UNCHECKED)
+      UI.const_set(:MF_CHECKED, 1) unless UI.const_defined?(:MF_CHECKED)
+    end
+
+    def project_point_to_plane(point, plane)
+      if Geom.respond_to?(:project_point_to_plane)
+        Geom.project_point_to_plane(point, plane)
+      else
+        point_on_plane, normal = plane_point_and_normal(plane)
+        return point unless point_on_plane && normal
+
+        vector = point.vector_to(point_on_plane)
+        offset = vector.dot(normal)
+        point.offset(normal, offset)
+      end
+    end
+
+    def project_vector_to_plane(vector, plane)
+      if vector.respond_to?(:project_to_plane)
+        vector.project_to_plane(plane)
+      else
+        _, normal = plane_point_and_normal(plane)
+        return vector.clone unless normal
+
+        vector - (normal * vector.dot(normal))
+      end
+    end
+
+    def plane_point_and_normal(plane)
+      case plane
+      when Array
+        if plane.length == 4
+          normal = Geom::Vector3d.new(plane[0], plane[1], plane[2])
+          return unless normal.length > Float::EPSILON
+
+          normal.normalize!
+          point_on_plane = Geom.intersect_line_plane([ORIGIN, normal], plane)
+          return unless point_on_plane
+
+          [point_on_plane, normal]
+        elsif plane.length == 2
+          point_on_plane = plane[0]
+          normal = plane[1]
+          point_on_plane = Geom::Point3d.new(point_on_plane) unless point_on_plane.is_a?(Geom::Point3d)
+          normal = Geom::Vector3d.new(normal) unless normal.is_a?(Geom::Vector3d)
+          return unless normal.length > Float::EPSILON
+
+          normal.normalize!
+          [point_on_plane, normal]
+        end
+      end
+    rescue StandardError
+      nil
+    end
+  end
+
+  Compatibility.ensure_ui_constants
   unless defined?(@loaded)
     @loaded = true
 
@@ -278,11 +341,11 @@ module FaceDivider
       end
 
       def project_point(point)
-        Geom.project_point_to_plane(point, @plane)
+        FaceDivider::Compatibility.project_point_to_plane(point, @plane)
       end
 
       def vector_on_plane(vector)
-        vector.project_to_plane(@plane)
+        FaceDivider::Compatibility.project_vector_to_plane(vector, @plane)
       end
 
       def face_segments(origin, direction)
