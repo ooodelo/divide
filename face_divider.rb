@@ -7,7 +7,7 @@ module FaceDivider
   VERSION = '1.0.0'.freeze
 
   unless defined?(FaceDivider::EXTENSION)
-    loader = File.join(__dir__, 'src', 'face_divider', 'main')
+    loader = File.join(__dir__, 'face_divider', 'main')
     EXTENSION = SketchupExtension.new(PLUGIN_NAME, loader)
     EXTENSION.description = 'Tools for subdividing faces with parallel lines and rectangular grids.'
     EXTENSION.version = VERSION
